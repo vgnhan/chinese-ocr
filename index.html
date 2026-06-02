@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Chinese Reader with Sidebar Index</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #fcf8e3; /* Soft, warm yellowish background */
+            color: #2c3e50;            /* Dark charcoal text */
+            font-family: "PingFang SC", "Microsoft YaHei", "SimSun", sans-serif; 
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Left Sidebar Styling */
+        .sidebar {
+            width: 320px;
+            background-color: #f4edd0;
+            border-right: 1px solid #e1dbb7;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .sidebar h3 {
+            margin-top: 0;
+            color: #795548;
+            font-size: 18px;
+            border-bottom: 2px solid #795548;
+            padding-bottom: 8px;
+        }
+        .save-btn {
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #795548;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        .save-btn:hover {
+            background-color: #5d4037;
+        }
+        .doc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        /* Flex wrapper for the title box + delete button alignment */
+        .doc-item-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .doc-item {
+            padding: 12px;
+            background: #fdfcf7;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid #e6dfc3;
+            font-size: 16px;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+        .doc-item:hover {
+            background: #fff;
+            border-color: #795548;
+        }
+        .doc-item.active {
+            background: #795548;
+            color: white;
+            border-color: #795548;
+        }
+
+        /* Red Delete Button Styling */
+        .delete-btn {
+            background-color: #d9534f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 14px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .delete-btn:hover {
+            background-color: #c9302c;
+        }
+
+        /* Main Content Area Styling */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 40px;
+            overflow-y: auto;
+        }
+        .toolbar {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto 30px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e1dbb7;
+            padding-bottom: 15px;
+        }
+        #sync-status {
+            font-size: 14px;
+            color: #a19b80;
+            font-weight: bold;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #795548;
+        }
+        input[type="range"] {
+            cursor: pointer;
+            accent-color: #795548;
+        }
+
+        .container {
+            max-width: 1000px;         
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Title Input Styling */
+        #title-area {
+            width: 100%;
+            font-size: 48px;         
+            font-weight: bold;
+            line-height: 1.4;
+            margin-bottom: 25px;
+            border: none;
+            outline: none;
+            background: transparent;
+        }
+        #title-area:empty::before {
+            content: "Untitled Paragraph...";
+            color: #a19b80;
+            font-weight: normal;
+        }
+
+        /* Body Input Styling */
+        #reader-area {
+            width: 100%;
+            min-height: 60vh;
+            font-size: 36px;         
+            line-height: 1.9;      
+            border: none;
+            outline: none;
+            background: transparent;
+            white-space: pre-wrap;  
+        }
+        #reader-area:empty::before {
+            content: "Paste or type your Chinese text here...";
+            color: #a19b80;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Left Sidebar layout -->
+    <div class="sidebar">
+        <button class="save-btn" onclick="saveCurrentParagraph()">+ Save & Sync</button>
+        <h3>Saved Texts</h3>
+        <ul class="doc-list" id="doc-list"></ul>
+    </div>
+
+    <!-- Right Side Main Content Area -->
+    <div class="main-content">
+        <div class="toolbar">
+            <span id="sync-status">Connecting to cloud...</span>
+            <div class="slider-container">
+                <label for="font-slider">A-</label>
+                <input type="range" id="font-slider" min="24" max="64" value="36" oninput="changeFontSize(this.value)">
+                <label for="font-slider">A+</label>
+                <span id="size-display" style="font-size: 14px; font-weight: normal; margin-left: 5px;">(36px)</span>
+            </div>
+        </div>
+
+        <div class="container">
+            <div id="title-area" contenteditable="true"></div>
+            <div id="reader-area" contenteditable="true"></div>
+        </div>
+    </div>
+
+    <!-- Firebase Connection Engine -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // !!! PASTE YOUR WEB API CONFIG INFO HERE !!!
+	const firebaseConfig = {
+  	apiKey: "AIzaSyDjLaqhKJ48HSYBaVMshlt_Lw1Oul3Mvvc",
+ 	authDomain: "chinese-ocr-69fc4.firebaseapp.com",
+  	projectId: "chinese-ocr-69fc4",
+  	storageBucket: "chinese-ocr-69fc4.firebasestorage.app",
+  	messagingSenderId: "161943614491",
+  	appId: "1:161943614491:web:2fe64763bfb4358a8e34be"
+};
+
+        // Connect apps
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const docRef = doc(db, "chineseReader", "sidebarDoc");
+
+        const readerArea = document.getElementById('reader-area');
+        const titleArea = document.getElementById('title-area');
+        const sizeDisplay = document.getElementById('size-display');
+        const docListElement = document.getElementById('doc-list');
+        const statusSpan = document.getElementById('sync-status');
+
+        let paragraphs = [];
+        let currentActiveId = null;
+
+        // Fetch master array on initialization
+        async function loadFromCloud() {
+            statusSpan.innerText = "Syncing with cloud...";
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    paragraphs = docSnap.data().list || [];
+                    renderSidebar();
+                    if (paragraphs.length > 0) {
+                        loadParagraph(paragraphs[0].id);
+                    }
+                    statusSpan.innerText = "Cloud database connected.";
+                } else {
+                    statusSpan.innerText = "Cloud empty. Ready to start.";
+                    renderSidebar();
+                }
+            } catch (error) {
+                console.error("Cloud load error:", error);
+                statusSpan.innerText = "Cloud error. Running in offline layout mode.";
+            }
+        }
+        loadFromCloud();
+
+        // Process additions and edits
+        window.saveCurrentParagraph = async function() {
+            statusSpan.innerText = "Saving to cloud...";
+            const rawTitle = titleArea.innerText.trim();
+            const bodyText = readerArea.innerText;
+            const titleText = rawTitle ? rawTitle : "Untitled Paragraph";
+
+            if (currentActiveId) {
+                const index = paragraphs.findIndex(p => p.id === currentActiveId);
+                if (index !== -1) {
+                    paragraphs[index].title = titleText;
+                    paragraphs[index].body = bodyText;
+                }
+            } else {
+                const newId = Date.now().toString();
+                paragraphs.push({ id: newId, title: titleText, body: bodyText });
+                currentActiveId = newId;
+            }
+
+            try {
+                await setDoc(docRef, { list: paragraphs });
+                statusSpan.innerText = "All paragraphs synced to cloud!";
+                renderSidebar();
+            } catch (error) {
+                console.error("Cloud save error:", error);
+                statusSpan.innerText = "Save failed.";
+            }
+        }
+
+        // Processes item removal from master database list
+        window.deleteParagraph = async function(id) {
+            if (!confirm("Are you sure you want to permanently delete this paragraph from the cloud?")) return;
+            
+            statusSpan.innerText = "Deleting item...";
+            paragraphs = paragraphs.filter(p => p.id !== id);
+            
+            if (currentActiveId === id) {
+                currentActiveId = null;
+                titleArea.innerText = '';
+                readerArea.innerText = '';
+            }
+            
+            try {
+                await setDoc(docRef, { list: paragraphs });
+                statusSpan.innerText = "Deleted and synced!";
+                renderSidebar();
+            } catch (error) {
+                console.error("Delete error:", error);
+                statusSpan.innerText = "Delete action failed.";
+            }
+        }
+
+        function renderSidebar() {
+            docListElement.innerHTML = '';
+            
+            // New Canvas reset option
+            const newSlateItem = document.createElement('li');
+            newSlateItem.className = 'doc-item';
+            newSlateItem.style.color = '#795548';
+            newSlateItem.style.borderStyle = 'dashed';
+            newSlateItem.innerText = "[ Clear Canvas ]";
+            newSlateItem.onclick = clearCanvas;
+            docListElement.appendChild(newSlateItem);
+
+            // Populate document list items with integrated deletion tags
+            paragraphs.forEach(p => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'doc-item-wrapper';
+
+                const li = document.createElement('li');
+                li.className = `doc-item ${p.id === currentActiveId ? 'active' : ''}`;
+                li.innerText = p.title;
+                li.onclick = () => loadParagraph(p.id);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'delete-btn';
+                delBtn.innerText = 'X';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation(); // Stops the sidebar selection event rule triggering
+                    deleteParagraph(p.id);
+                };
+
+                wrapper.appendChild(li);
+                wrapper.appendChild(delBtn);
+                docListElement.appendChild(wrapper);
+            });
+        }
+
+        function loadParagraph(id) {
+            currentActiveId = id;
+            const target = paragraphs.find(p => p.id === id);
+            if (target) {
+                titleArea.innerText = target.title;
+                readerArea.innerText = target.body;
+            }
+            renderSidebar();
+        }
+
+        function clearCanvas() {
+            currentActiveId = null;
+            titleArea.innerText = '';
+            readerArea.innerText = '';
+            renderSidebar();
+        }
+
+        window.changeFontSize = function(size) {
+            readerArea.style.fontSize = size + 'px';
+            sizeDisplay.innerText = `(${size}px)`;
+        }
+
+        function handleTab(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault(); 
+                const selection = window.getSelection();
+                const range = selection.getRangeAt(0);
+                const tabNode = document.createTextNode("    "); 
+                range.insertNode(tabNode);
+                range.setStartAfter(tabNode);
+                range.setEndAfter(tabNode); 
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        }
+        readerArea.addEventListener('keydown', handleTab);
+        titleArea.addEventListener('keydown', handleTab);
+    </script>
+</body>
+</html>

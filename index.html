@@ -167,14 +167,14 @@
             font-weight: bold;
             color: #795548;
             white-space: nowrap;
-            margin-right: 180px; /* Leaves space for the fixed Google Translate widget */
+            margin-right: 180px; /* Space for fixed translate widget */
         }
         input[type="range"] {
             cursor: pointer;
             accent-color: #795548;
         }
 
-        /* ALWAYS AVAILABLE: Fixed Google Translate Widget on the Right */
+        /* Fixed Full-Page Google Translate Widget */
         #google_translate_element {
             position: fixed;
             top: 25px;
@@ -187,7 +187,7 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        /* Pop-up Selection Translate Button */
+        /* Hovering Pop-up trigger button */
         #highlight-translate-btn {
             display: none;
             position: absolute;
@@ -204,6 +204,54 @@
         }
         #highlight-translate-btn:hover {
             background: #5d4037;
+        }
+
+        /* IN-SITE TRANSLATION CARD (MODAL) */
+        .translation-modal {
+            display: none;
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 350px;
+            background: #ffffff;
+            border-left: 5px solid #795548;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            border-radius: 4px;
+            padding: 15px;
+            z-index: 2000;
+            animation: slideIn 0.2s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #795548;
+            font-weight: bold;
+        }
+        .modal-close {
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: #a19b80;
+        }
+        .modal-close:hover {
+            color: #c9302c;
+        }
+        .translation-text {
+            font-size: 16px;
+            line-height: 1.5;
+            color: #2c3e50;
+            max-height: 150px;
+            overflow-y: auto;
         }
 
         .container {
@@ -248,7 +296,15 @@
 
     <div id="google_translate_element"></div>
 
-    <button id="highlight-translate-btn">Translate Text</button>
+    <button id="highlight-translate-btn">Translate</button>
+
+    <div class="translation-modal" id="translation-modal">
+        <div class="modal-header">
+            <span>English Translation</span>
+            <button class="modal-close" onclick="closeTranslationModal()">✕</button>
+        </div>
+        <div class="translation-text" id="translation-text">Loading...</div>
+    </div>
 
     <div class="sidebar" id="sidebar">
         <button class="save-btn" onclick="saveCurrentParagraph()">+ Save & Sync</button>
@@ -465,42 +521,65 @@
 
     <script>
         const translateBtn = document.getElementById('highlight-translate-btn');
+        const modal = document.getElementById('translation-modal');
+        const modalText = document.getElementById('translation-text');
         let selectedText = "";
 
-        // Listen for user text highlighting
+        // Track text selection
         document.addEventListener('mouseup', function(e) {
             const selection = window.getSelection();
             selectedText = selection.toString().trim();
 
-            // If text is actually highlighted, position and display the pop-up button
             if (selectedText.length > 0) {
                 const range = selection.getRangeAt(0);
                 const rect = range.getBoundingClientRect();
 
+                // Position the floating action button over selection
                 translateBtn.style.left = `${rect.left + window.scrollX + (rect.width / 2) - 50}px`;
                 translateBtn.style.top = `${rect.top + window.scrollY - 40}px`;
                 translateBtn.style.display = 'block';
             } else {
-                translateBtn.style.display = 'none';
+                // If clicking away outside the modal, hide the selection trigger button
+                if (e.target !== translateBtn && !modal.contains(e.target)) {
+                    translateBtn.style.display = 'none';
+                }
             }
         });
 
-        // Hide the button if you click anywhere else without highlighting
+        // Block trigger clearing on immediate target click down
         document.addEventListener('mousedown', function(e) {
-            if (e.target !== translateBtn) {
+            if (e.target !== translateBtn && !modal.contains(e.target)) {
                 translateBtn.style.display = 'none';
             }
         });
 
-        // Redirect the highlighted text directly into a Google Translate tab
-        translateBtn.addEventListener('click', function() {
+        // Trigger native internal translation fetching
+        translateBtn.addEventListener('click', async function() {
             if (selectedText.length > 0) {
-                // Opens a new browser tab translating exactly what you highlighted into English
-                const translateUrl = `https://translate.google.com/?sl=zh-CN&tl=en&text=${encodeURIComponent(selectedText)}&op=translate`;
-                window.open(translateUrl, '_blank');
                 translateBtn.style.display = 'none';
+                modalText.innerText = "Translating...";
+                modal.style.display = 'block';
+
+                try {
+                    // Call the background translation API directly
+                    const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(selectedText)}&langpair=zh-CN|en`);
+                    const data = await response.json();
+                    
+                    if(data.responseData) {
+                        modalText.innerText = data.responseData.translatedText;
+                    } else {
+                        modalText.innerText = "Translation processing error.";
+                    }
+                } catch (error) {
+                    console.error(error);
+                    modalText.innerText = "Network translation failed.";
+                }
             }
         });
+
+        window.closeTranslationModal = function() {
+            modal.style.display = 'none';
+        }
     </script>
 </body>
 </html>

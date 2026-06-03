@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Chinese Reader with Sidebar Index</title>
+    <title>Cloud Chinese Reader</title>
     <style>
         * {
             box-sizing: border-box;
@@ -17,9 +17,10 @@
             display: flex;
             height: 100vh;
             overflow: hidden;
+            position: relative;
         }
 
-        /* Left Sidebar Styling */
+        /* Left Sidebar - Hidden by default */
         .sidebar {
             width: 320px;
             background-color: #f4edd0;
@@ -28,6 +29,16 @@
             flex-direction: column;
             padding: 20px;
             overflow-y: auto;
+            position: absolute;
+            left: -320px; /* Hidden off-screen */
+            top: 0;
+            bottom: 0;
+            z-index: 100;
+            transition: left 0.3s ease; /* Smooth slide animation */
+        }
+        /* Class added by JavaScript to slide sidebar open */
+        .sidebar.open {
+            left: 0;
         }
         .sidebar h3 {
             margin-top: 0;
@@ -60,19 +71,23 @@
             gap: 8px;
         }
         
-        /* Flex wrapper for the title box + delete button alignment */
+        /* Document Card Layout */
         .doc-item-wrapper {
             display: flex;
             align-items: center;
-            gap: 8px;
             width: 100%;
+            background: #fdfcf7;
+            border-radius: 4px;
+            border: 1px solid #e6dfc3;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        .doc-item-wrapper:hover {
+            border-color: #795548;
         }
         .doc-item {
             padding: 12px;
-            background: #fdfcf7;
-            border-radius: 4px;
             cursor: pointer;
-            border: 1px solid #e6dfc3;
             font-size: 16px;
             font-weight: bold;
             white-space: nowrap;
@@ -80,29 +95,25 @@
             text-overflow: ellipsis;
             flex: 1;
         }
-        .doc-item:hover {
-            background: #fff;
-            border-color: #795548;
-        }
-        .doc-item.active {
-            background: #795548;
-            color: white;
+        .doc-item-wrapper.active {
+            background: #eedea6;
             border-color: #795548;
         }
 
-        /* Red Delete Button Styling */
+        /* Subtle, Blended Delete Button */
         .delete-btn {
-            background-color: #d9534f;
-            color: white;
+            background: transparent;
+            color: #a19b80; /* Faded matching tone */
             border: none;
-            border-radius: 4px;
             padding: 12px 14px;
             cursor: pointer;
             font-weight: bold;
             font-size: 14px;
+            transition: color 0.2s, background-color 0.2s;
         }
         .delete-btn:hover {
-            background-color: #c9302c;
+            color: #c9302c; /* Turns red only when consciously hovering over it */
+            background-color: rgba(201, 48, 44, 0.08); 
         }
 
         /* Main Content Area Styling */
@@ -110,9 +121,18 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            padding: 40px;
+            padding: 20px 40px 40px 40px;
             overflow-y: auto;
+            width: 100%;
         }
+        
+        /* Mobile adjustment for padding to clear top buttons */
+        @media (max-width: 600px) {
+            .main-content {
+                padding: 20px;
+            }
+        }
+
         .toolbar {
             width: 100%;
             max-width: 1000px;
@@ -122,11 +142,31 @@
             align-items: center;
             border-bottom: 1px solid #e1dbb7;
             padding-bottom: 15px;
+            gap: 10px;
         }
+        
+        /* Toggle Sidebar Button Menu Trigger */
+        .menu-toggle {
+            background: #795548;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 14px;
+            font-size: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            z-index: 101;
+        }
+        .menu-toggle:hover {
+            background-color: #5d4037;
+        }
+
         #sync-status {
             font-size: 14px;
             color: #a19b80;
             font-weight: bold;
+            flex: 1;
+            margin-left: 15px;
         }
         .slider-container {
             display: flex;
@@ -135,6 +175,7 @@
             font-size: 16px;
             font-weight: bold;
             color: #795548;
+            white-space: nowrap;
         }
         input[type="range"] {
             cursor: pointer;
@@ -147,7 +188,7 @@
             margin: 0 auto;
         }
 
-        /* Title Input Styling */
+        /* Title Area */
         #title-area {
             width: 100%;
             font-size: 48px;         
@@ -164,7 +205,7 @@
             font-weight: normal;
         }
 
-        /* Body Input Styling */
+        /* Body Area */
         #reader-area {
             width: 100%;
             min-height: 60vh;
@@ -183,17 +224,17 @@
 </head>
 <body>
 
-    <!-- Left Sidebar layout -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <button class="save-btn" onclick="saveCurrentParagraph()">+ Save & Sync</button>
         <h3>Saved Texts</h3>
         <ul class="doc-list" id="doc-list"></ul>
     </div>
 
-    <!-- Right Side Main Content Area -->
     <div class="main-content">
         <div class="toolbar">
+            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
             <span id="sync-status">Connecting to cloud...</span>
+            
             <div class="slider-container">
                 <label for="font-slider">A-</label>
                 <input type="range" id="font-slider" min="24" max="64" value="36" oninput="changeFontSize(this.value)">
@@ -208,12 +249,11 @@
         </div>
     </div>
 
-    <!-- Firebase Connection Engine -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // !!! PASTE YOUR WEB API CONFIG INFO HERE !!!
+        // !!! PASTE YOUR FIREBASE ACCREDITATION DATA HERE !!!
 	const firebaseConfig = {
   	apiKey: "AIzaSyDjLaqhKJ48HSYBaVMshlt_Lw1Oul3Mvvc",
  	authDomain: "chinese-ocr-69fc4.firebaseapp.com",
@@ -223,11 +263,11 @@
   	appId: "1:161943614491:web:2fe64763bfb4358a8e34be"
 };
 
-        // Connect apps
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const docRef = doc(db, "chineseReader", "sidebarDoc");
 
+        const sidebarElement = document.getElementById('sidebar');
         const readerArea = document.getElementById('reader-area');
         const titleArea = document.getElementById('title-area');
         const sizeDisplay = document.getElementById('size-display');
@@ -237,7 +277,12 @@
         let paragraphs = [];
         let currentActiveId = null;
 
-        // Fetch master array on initialization
+        // Drawer Slider Function toggle rules
+        window.toggleSidebar = function() {
+            sidebarElement.classList.toggle('open');
+        }
+
+        // Fetch Master List Data
         async function loadFromCloud() {
             statusSpan.innerText = "Syncing with cloud...";
             try {
@@ -248,19 +293,19 @@
                     if (paragraphs.length > 0) {
                         loadParagraph(paragraphs[0].id);
                     }
-                    statusSpan.innerText = "Cloud database connected.";
+                    statusSpan.innerText = "Cloud synced.";
                 } else {
-                    statusSpan.innerText = "Cloud empty. Ready to start.";
+                    statusSpan.innerText = "Cloud empty. Ready.";
                     renderSidebar();
                 }
             } catch (error) {
-                console.error("Cloud load error:", error);
-                statusSpan.innerText = "Cloud error. Running in offline layout mode.";
+                console.error(error);
+                statusSpan.innerText = "Cloud offline error.";
             }
         }
         loadFromCloud();
 
-        // Process additions and edits
+        // Save & Sync Database Processing
         window.saveCurrentParagraph = async function() {
             statusSpan.innerText = "Saving to cloud...";
             const rawTitle = titleArea.innerText.trim();
@@ -281,17 +326,16 @@
 
             try {
                 await setDoc(docRef, { list: paragraphs });
-                statusSpan.innerText = "All paragraphs synced to cloud!";
+                statusSpan.innerText = "Synced successfully!";
                 renderSidebar();
             } catch (error) {
-                console.error("Cloud save error:", error);
                 statusSpan.innerText = "Save failed.";
             }
         }
 
-        // Processes item removal from master database list
+        // Delete Processing Array
         window.deleteParagraph = async function(id) {
-            if (!confirm("Are you sure you want to permanently delete this paragraph from the cloud?")) return;
+            if (!confirm("Delete this paragraph permanently?")) return;
             
             statusSpan.innerText = "Deleting item...";
             paragraphs = paragraphs.filter(p => p.id !== id);
@@ -304,41 +348,47 @@
             
             try {
                 await setDoc(docRef, { list: paragraphs });
-                statusSpan.innerText = "Deleted and synced!";
+                statusSpan.innerText = "Deleted and updated.";
                 renderSidebar();
             } catch (error) {
-                console.error("Delete error:", error);
-                statusSpan.innerText = "Delete action failed.";
+                statusSpan.innerText = "Delete error.";
             }
         }
 
         function renderSidebar() {
             docListElement.innerHTML = '';
             
-            // New Canvas reset option
-            const newSlateItem = document.createElement('li');
+            // Clear / Reset Canvas item configuration
+            const newSlateItem = document.createElement('div');
             newSlateItem.className = 'doc-item';
             newSlateItem.style.color = '#795548';
-            newSlateItem.style.borderStyle = 'dashed';
+            newSlateItem.style.border = '1px dashed #795548';
+            newSlateItem.style.background = 'transparent';
+            newSlateItem.style.textAlign = 'center';
             newSlateItem.innerText = "[ Clear Canvas ]";
-            newSlateItem.onclick = clearCanvas;
+            newSlateItem.onclick = () => {
+                clearCanvas();
+                sidebarElement.classList.remove('open'); // Close panel on choice
+            };
             docListElement.appendChild(newSlateItem);
 
-            // Populate document list items with integrated deletion tags
             paragraphs.forEach(p => {
                 const wrapper = document.createElement('div');
-                wrapper.className = 'doc-item-wrapper';
+                wrapper.className = `doc-item-wrapper ${p.id === currentActiveId ? 'active' : ''}`;
 
-                const li = document.createElement('li');
-                li.className = `doc-item ${p.id === currentActiveId ? 'active' : ''}`;
+                const li = document.createElement('div');
+                li.className = 'doc-item';
                 li.innerText = p.title;
-                li.onclick = () => loadParagraph(p.id);
+                li.onclick = () => {
+                    loadParagraph(p.id);
+                    sidebarElement.classList.remove('open'); // Hide sidebar automatically on mobile select
+                };
 
                 const delBtn = document.createElement('button');
                 delBtn.className = 'delete-btn';
-                delBtn.innerText = 'X';
+                delBtn.innerText = '✕';
                 delBtn.onclick = (e) => {
-                    e.stopPropagation(); // Stops the sidebar selection event rule triggering
+                    e.stopPropagation();
                     deleteParagraph(p.id);
                 };
 

@@ -566,13 +566,11 @@
                 boxOriginal.innerText = selectedText;
                 boxEnglish.innerText = "Translating...";
 
-                // 2. Compute local Pinyin using pinyinPro CDN library instantly
-                try {
-                    const { pinyin } = pinyinPro;
-                    boxPinyin.innerText = pinyin(selectedText, { toneType: 'symbol' });
-                } catch(pinyinError) {
-                    boxPinyin.innerText = "Pinyin calculation error.";
-                }
+		// 2. Compute local Pinyin using pinyinPro CDN library instantly
+				try {
+    				const { pinyin } = pinyinPro;
+    				boxPinyin.innerText = pinyin(selectedText, { toneType: 'symbol', v: true });
+				} catch(pinyinError) {
 
                 // 3. Fetch background Translation
                 try {

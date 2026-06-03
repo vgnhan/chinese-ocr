@@ -574,21 +574,30 @@
             }
 
             // Translation (network)
-            try {
-                const response = await fetch(
-                    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(selectedText)}&langpair=zh-CN|vi`
-                );
-                const data = await response.json();
-                if (data.responseData) {
-                    boxEnglish.innerText = data.responseData.translatedText;
-                } else {
-                    boxEnglish.innerText = "Translation parsing error.";
-                }
-            } catch (error) {
-                boxEnglish.innerText = "Network translation failed.";
-            }
-        }
+try {
+    const { pinyin } = pinyinPro;
+
+    // Get array of pinyin with word boundary info
+    const tokens = pinyin(selectedText, {
+        toneType: 'symbol',
+        type: 'all',        // returns rich objects per segment
+        segment: true,
+        v: true
     });
+
+    // Each token: { origin, pinyin, ... } — origin is the Chinese word segment
+    const grouped = tokens.map(token => {
+        if (token.origin.length > 1) {
+            // Multi-char word: get pinyin with no separator
+            return pinyin(token.origin, { toneType: 'symbol', separator: '', v: true });
+        }
+        return token.pinyin;
+    }).join(' ');
+
+    boxPinyin.innerText = grouped;
+} catch (pinyinError) {
+    boxPinyin.innerText = "(pinyin unavailable)";
+}
 </script>
 </body>
 </html>

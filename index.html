@@ -20,7 +20,7 @@
             position: relative;
         }
 
-        /* Left Sidebar - Hidden by default */
+        /* Left Sidebar Layout */
         .sidebar {
             width: 320px;
             background-color: #f4edd0;
@@ -30,13 +30,12 @@
             padding: 20px;
             overflow-y: auto;
             position: absolute;
-            left: -320px; /* Hidden off-screen */
+            left: -320px; 
             top: 0;
             bottom: 0;
             z-index: 100;
-            transition: left 0.3s ease; /* Smooth slide animation */
+            transition: left 0.3s ease; 
         }
-        /* Class added by JavaScript to slide sidebar open */
         .sidebar.open {
             left: 0;
         }
@@ -71,7 +70,6 @@
             gap: 8px;
         }
         
-        /* Document Card Layout */
         .doc-item-wrapper {
             display: flex;
             align-items: center;
@@ -100,23 +98,21 @@
             border-color: #795548;
         }
 
-        /* Subtle, Blended Delete Button */
         .delete-btn {
             background: transparent;
-            color: #a19b80; /* Faded matching tone */
+            color: #a19b80; 
             border: none;
             padding: 12px 14px;
             cursor: pointer;
             font-weight: bold;
             font-size: 14px;
-            transition: color 0.2s, background-color 0.2s;
         }
         .delete-btn:hover {
-            color: #c9302c; /* Turns red only when consciously hovering over it */
+            color: #c9302c; 
             background-color: rgba(201, 48, 44, 0.08); 
         }
 
-        /* Main Content Area Styling */
+        /* Main Content Area */
         .main-content {
             flex: 1;
             display: flex;
@@ -126,7 +122,6 @@
             width: 100%;
         }
         
-        /* Mobile adjustment for padding to clear top buttons */
         @media (max-width: 600px) {
             .main-content {
                 padding: 20px;
@@ -145,7 +140,6 @@
             gap: 10px;
         }
         
-        /* Toggle Sidebar Button Menu Trigger */
         .menu-toggle {
             background: #795548;
             color: white;
@@ -156,9 +150,6 @@
             cursor: pointer;
             font-weight: bold;
             z-index: 101;
-        }
-        .menu-toggle:hover {
-            background-color: #5d4037;
         }
 
         #sync-status {
@@ -176,10 +167,43 @@
             font-weight: bold;
             color: #795548;
             white-space: nowrap;
+            margin-right: 180px; /* Leaves space for the fixed Google Translate widget */
         }
         input[type="range"] {
             cursor: pointer;
             accent-color: #795548;
+        }
+
+        /* ALWAYS AVAILABLE: Fixed Google Translate Widget on the Right */
+        #google_translate_element {
+            position: fixed;
+            top: 25px;
+            right: 20px;
+            z-index: 999;
+            background: #f4edd0;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #e1dbb7;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* Pop-up Selection Translate Button */
+        #highlight-translate-btn {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background: #795548;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        #highlight-translate-btn:hover {
+            background: #5d4037;
         }
 
         .container {
@@ -188,7 +212,6 @@
             margin: 0 auto;
         }
 
-        /* Title Area */
         #title-area {
             width: 100%;
             font-size: 48px;         
@@ -205,7 +228,6 @@
             font-weight: normal;
         }
 
-        /* Body Area */
         #reader-area {
             width: 100%;
             min-height: 60vh;
@@ -223,6 +245,10 @@
     </style>
 </head>
 <body>
+
+    <div id="google_translate_element"></div>
+
+    <button id="highlight-translate-btn">Translate Text</button>
 
     <div class="sidebar" id="sidebar">
         <button class="save-btn" onclick="saveCurrentParagraph()">+ Save & Sync</button>
@@ -277,12 +303,10 @@
         let paragraphs = [];
         let currentActiveId = null;
 
-        // Drawer Slider Function toggle rules
         window.toggleSidebar = function() {
             sidebarElement.classList.toggle('open');
         }
 
-        // Fetch Master List Data
         async function loadFromCloud() {
             statusSpan.innerText = "Syncing with cloud...";
             try {
@@ -299,13 +323,11 @@
                     renderSidebar();
                 }
             } catch (error) {
-                console.error(error);
                 statusSpan.innerText = "Cloud offline error.";
             }
         }
         loadFromCloud();
 
-        // Save & Sync Database Processing
         window.saveCurrentParagraph = async function() {
             statusSpan.innerText = "Saving to cloud...";
             const rawTitle = titleArea.innerText.trim();
@@ -333,19 +355,14 @@
             }
         }
 
-        // Delete Processing Array
         window.deleteParagraph = async function(id) {
             if (!confirm("Delete this paragraph permanently?")) return;
-            
-            statusSpan.innerText = "Deleting item...";
             paragraphs = paragraphs.filter(p => p.id !== id);
-            
             if (currentActiveId === id) {
                 currentActiveId = null;
                 titleArea.innerText = '';
                 readerArea.innerText = '';
             }
-            
             try {
                 await setDoc(docRef, { list: paragraphs });
                 statusSpan.innerText = "Deleted and updated.";
@@ -357,8 +374,6 @@
 
         function renderSidebar() {
             docListElement.innerHTML = '';
-            
-            // Clear / Reset Canvas item configuration
             const newSlateItem = document.createElement('div');
             newSlateItem.className = 'doc-item';
             newSlateItem.style.color = '#795548';
@@ -368,7 +383,7 @@
             newSlateItem.innerText = "[ Clear Canvas ]";
             newSlateItem.onclick = () => {
                 clearCanvas();
-                sidebarElement.classList.remove('open'); // Close panel on choice
+                sidebarElement.classList.remove('open');
             };
             docListElement.appendChild(newSlateItem);
 
@@ -381,7 +396,7 @@
                 li.innerText = p.title;
                 li.onclick = () => {
                     loadParagraph(p.id);
-                    sidebarElement.classList.remove('open'); // Hide sidebar automatically on mobile select
+                    sidebarElement.classList.remove('open');
                 };
 
                 const delBtn = document.createElement('button');
@@ -435,6 +450,57 @@
         }
         readerArea.addEventListener('keydown', handleTab);
         titleArea.addEventListener('keydown', handleTab);
+    </script>
+
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'zh-CN', 
+                includedLanguages: 'en,es,ja,ko', 
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+    <script>
+        const translateBtn = document.getElementById('highlight-translate-btn');
+        let selectedText = "";
+
+        // Listen for user text highlighting
+        document.addEventListener('mouseup', function(e) {
+            const selection = window.getSelection();
+            selectedText = selection.toString().trim();
+
+            // If text is actually highlighted, position and display the pop-up button
+            if (selectedText.length > 0) {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+
+                translateBtn.style.left = `${rect.left + window.scrollX + (rect.width / 2) - 50}px`;
+                translateBtn.style.top = `${rect.top + window.scrollY - 40}px`;
+                translateBtn.style.display = 'block';
+            } else {
+                translateBtn.style.display = 'none';
+            }
+        });
+
+        // Hide the button if you click anywhere else without highlighting
+        document.addEventListener('mousedown', function(e) {
+            if (e.target !== translateBtn) {
+                translateBtn.style.display = 'none';
+            }
+        });
+
+        // Redirect the highlighted text directly into a Google Translate tab
+        translateBtn.addEventListener('click', function() {
+            if (selectedText.length > 0) {
+                // Opens a new browser tab translating exactly what you highlighted into English
+                const translateUrl = `https://translate.google.com/?sl=zh-CN&tl=en&text=${encodeURIComponent(selectedText)}&op=translate`;
+                window.open(translateUrl, '_blank');
+                translateBtn.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>

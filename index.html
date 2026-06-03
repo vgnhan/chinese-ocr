@@ -524,69 +524,71 @@
         titleArea.addEventListener('keydown', handleTab);
     </script>
 
-    <script>
-        const translateBtn = document.getElementById('highlight-translate-btn');
-        const boxOriginal = document.getElementById('box-original');
-        const boxPinyin = document.getElementById('box-pinyin');
-        const boxEnglish = document.getElementById('box-english');
-        let selectedText = "";
+<script>
+    const translateBtn = document.getElementById('highlight-translate-btn');
+    const boxOriginal = document.getElementById('box-original');
+    const boxPinyin = document.getElementById('box-pinyin');
+    const boxEnglish = document.getElementById('box-english');
+    let selectedText = "";
 
-        // Track user text selections
-        document.addEventListener('mouseup', function(e) {
-            const selection = window.getSelection();
-            selectedText = selection.toString().trim();
+    document.addEventListener('mouseup', function(e) {
+        const selection = window.getSelection();
+        selectedText = selection.toString().trim();
 
-            if (selectedText.length > 0) {
-                const range = selection.getRangeAt(0);
-                const rect = range.getBoundingClientRect();
+        if (selectedText.length > 0) {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
 
-                // Position floating action helper cleanly over selection
-                translateBtn.style.left = `${rect.left + window.scrollX + (rect.width / 2) - 50}px`;
-                translateBtn.style.top = `${rect.top + window.scrollY - 40}px`;
-                translateBtn.style.display = 'block';
-            } else {
-                if (e.target !== translateBtn) {
-                    translateBtn.style.display = 'none';
-                }
-            }
-        });
-
-        document.addEventListener('mousedown', function(e) {
+            // Use fixed positioning (viewport-relative) — no scroll offset needed
+            translateBtn.style.position = 'fixed';
+            translateBtn.style.left = `${rect.left + (rect.width / 2) - 50}px`;
+            translateBtn.style.top = `${rect.top - 40}px`;
+            translateBtn.style.display = 'block';
+        } else {
             if (e.target !== translateBtn) {
                 translateBtn.style.display = 'none';
             }
-        });
+        }
+    });
 
-        // Trigger translation execution inside side container fields
-        translateBtn.addEventListener('click', async function() {
-            if (selectedText.length > 0) {
-                translateBtn.style.display = 'none';
-                
-                // 1. Output original text to sidebar
-                boxOriginal.innerText = selectedText;
-                boxEnglish.innerText = "Translating...";
+    document.addEventListener('mousedown', function(e) {
+        if (e.target !== translateBtn) {
+            translateBtn.style.display = 'none';
+        }
+    });
 
-		// 2. Compute local Pinyin using pinyinPro CDN library instantly
-				try {
-    				const { pinyin } = pinyinPro;
-    				boxPinyin.innerText = pinyin(selectedText, { toneType: 'symbol', v: true });
-				} catch(pinyinError) {
+    translateBtn.addEventListener('click', async function() {
+        if (selectedText.length > 0) {
+            translateBtn.style.display = 'none';
 
-                // 3. Fetch background Translation
-                try {
-                    const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(selectedText)}&langpair=zh-CN|vi`);
-                    const data = await response.json();
-                    
-                    if(data.responseData) {
-                        boxEnglish.innerText = data.responseData.translatedText;
-                    } else {
-                        boxEnglish.innerText = "Translation parsing error.";
-                    }
-                } catch (error) {
-                    boxEnglish.innerText = "Network translation failed.";
-                }
+            boxOriginal.innerText = selectedText;
+            boxEnglish.innerText = "Translating...";
+            boxPinyin.innerText = "...";
+
+            // Pinyin (local, instant)
+            try {
+                const { pinyin } = pinyinPro;
+                boxPinyin.innerText = pinyin(selectedText, { toneType: 'symbol', v: true });
+            } catch (pinyinError) {
+                boxPinyin.innerText = "(pinyin unavailable)";
             }
-        });
-    </script>
+
+            // Translation (network)
+            try {
+                const response = await fetch(
+                    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(selectedText)}&langpair=zh-CN|vi`
+                );
+                const data = await response.json();
+                if (data.responseData) {
+                    boxEnglish.innerText = data.responseData.translatedText;
+                } else {
+                    boxEnglish.innerText = "Translation parsing error.";
+                }
+            } catch (error) {
+                boxEnglish.innerText = "Network translation failed.";
+            }
+        }
+    });
+</script>
 </body>
 </html>
